@@ -10,12 +10,13 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 import json
+import os
 from typing import Any, Dict, Iterable, List, Set
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
-FXMD_CALENDAR_URL = "https://fxmacrodata.com/api/v1/calendar/{currency}"
+FXMD_CALENDAR_URL = "https://api.fxmacrodata.com/v1/calendar/{currency}"
 
 
 def fetch_release_events(
@@ -25,8 +26,10 @@ def fetch_release_events(
 ) -> List[Dict[str, Any]]:
     params = urlencode({"start_date": start_date, "end_date": end_date})
     url = f"{FXMD_CALENDAR_URL.format(currency=currency.upper())}?{params}"
+    api_key = os.getenv("FXMACRODATA_API_KEY")
+    headers = {"X-API-Key": api_key} if api_key else {}
 
-    with urlopen(url, timeout=20) as response:
+    with urlopen(Request(url, headers=headers), timeout=20) as response:
         payload = json.load(response)
 
     return payload.get("data", [])
