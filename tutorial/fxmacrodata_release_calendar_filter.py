@@ -26,13 +26,22 @@ def fetch_release_events(
 ) -> List[Dict[str, Any]]:
     params = urlencode({"start_date": start_date, "end_date": end_date})
     url = f"{FXMD_CALENDAR_URL.format(currency=currency.upper())}?{params}"
-    api_key = os.getenv("FXMACRODATA_API_KEY")
-    headers = {"X-API-Key": api_key} if api_key else {}
+    api_key = (os.getenv("FXMACRODATA_API_KEY") or "").strip()
+    if any(ch.isspace() or not ch.isprintable() for ch in api_key):
+        raise ValueError("FXMACRODATA_API_KEY contains whitespace or control characters")
 
-    with urlopen(Request(url, headers=headers), timeout=20) as response:
+    request = Request(url)
+    if api_key:
+        # Unredirected headers are not copied onto a redirected request.
+        request.add_unredirected_header("X-API-Key", api_key)
+    with urlopen(request, timeout=20) as response:
         payload = json.load(response)
 
-    return payload.get("data", [])
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        detail = payload.get("detail") if isinstance(payload, dict) else None
+        raise ValueError(f"Unexpected FXMacroData calendar response: {detail or 'missing data'}")
+    return [row for row in rows if isinstance(row, dict)]
 
 
 def build_blackout_dates(
